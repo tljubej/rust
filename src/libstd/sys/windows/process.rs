@@ -130,6 +130,13 @@ impl Command {
         self.flags = flags;
     }
 
+    #[cfg(target_os="intime")]
+    pub fn spawn(&mut self, default: Stdio, needs_stdin: bool)
+                 -> io::Result<(Process, StdioPipes)> {
+                     panic!("");
+                 }
+
+    #[cfg(not(target_os="intime"))]
     pub fn spawn(&mut self, default: Stdio, needs_stdin: bool)
                  -> io::Result<(Process, StdioPipes)> {
         // To have the spawning semantics of unix/windows stay the same, we need
@@ -249,6 +256,14 @@ impl<'a> Drop for DropGuard<'a> {
 }
 
 impl Stdio {
+
+    #[cfg(target_os="intime")]
+    fn to_handle(&self, stdio_id: c::DWORD, pipe: &mut Option<AnonPipe>)
+                 -> io::Result<Handle> {
+                     panic!("");
+                 }
+
+    #[cfg(not(target_os="intime"))]
     fn to_handle(&self, stdio_id: c::DWORD, pipe: &mut Option<AnonPipe>)
                  -> io::Result<Handle> {
         match *self {
@@ -322,10 +337,16 @@ impl Process {
         Ok(())
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn id(&self) -> u32 {
         unsafe {
             c::GetProcessId(self.handle.raw()) as u32
         }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn id(&self) -> u32 {
+        panic!("");
     }
 
     pub fn wait(&mut self) -> io::Result<ExitStatus> {

@@ -21,6 +21,12 @@ pub unsafe fn init(_argc: isize, _argv: *const *const u8) { }
 
 pub unsafe fn cleanup() { }
 
+#[cfg(target_os="intime")]
+pub fn args() -> Args {
+    Args { cur: 0 as *mut *mut u16, range: 0..0 }
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn args() -> Args {
     unsafe {
         let mut nArgs: c_int = 0;
@@ -68,9 +74,14 @@ impl ExactSizeIterator for Args {
 }
 
 impl Drop for Args {
+    #[cfg(not(target_os="intime"))]    
     fn drop(&mut self) {
         // self.cur can be null if CommandLineToArgvW previously failed,
         // but LocalFree ignores NULL pointers
         unsafe { c::LocalFree(self.cur as *mut c_void); }
+    }
+
+    #[cfg(target_os="intime")]    
+    fn drop(&mut self) {
     }
 }

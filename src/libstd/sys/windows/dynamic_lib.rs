@@ -19,6 +19,7 @@ pub struct DynamicLibrary {
 }
 
 impl DynamicLibrary {
+    #[cfg(not(target_os="intime"))]
     pub fn open(filename: &str) -> io::Result<DynamicLibrary> {
         let filename = OsStr::new(filename)
                              .encode_wide()
@@ -26,6 +27,18 @@ impl DynamicLibrary {
                              .collect::<Vec<_>>();
         let result = unsafe {
             c::LoadLibraryW(filename.as_ptr())
+        };
+        if result.is_null() {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(DynamicLibrary { handle: result })
+        }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn open(filename: &str) -> io::Result<DynamicLibrary> {
+        let result = unsafe {
+            c::LoadLibrary(filename.as_ptr() as *mut i8)
         };
         if result.is_null() {
             Err(io::Error::last_os_error())

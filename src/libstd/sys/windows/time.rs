@@ -94,6 +94,12 @@ impl Instant {
 }
 
 impl SystemTime {
+    #[cfg(target_os="intime")]
+    pub fn now() -> SystemTime {
+        panic!("no time for you");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn now() -> SystemTime {
         unsafe {
             let mut t: SystemTime = mem::zeroed();

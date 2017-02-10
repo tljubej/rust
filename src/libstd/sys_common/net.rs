@@ -57,6 +57,7 @@ const MSG_NOSIGNAL: c_int = 0x0;
 // sockaddr and misc bindings
 ////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(not(target_os="intime"))]
 pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int,
                      payload: T) -> io::Result<()> {
     unsafe {
@@ -67,6 +68,13 @@ pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int,
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn setsockopt<T>(sock: &Socket, opt: c_int, val: c_int,
+                     payload: T) -> io::Result<()> {
+                         panic!("Not supported in InTime!");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn getsockopt<T: Copy>(sock: &Socket, opt: c_int,
                        val: c_int) -> io::Result<T> {
     unsafe {
@@ -80,6 +88,14 @@ pub fn getsockopt<T: Copy>(sock: &Socket, opt: c_int,
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn getsockopt<T: Copy>(sock: &Socket, opt: c_int,
+                       val: c_int) -> io::Result<T> {
+                         panic!("Not supported in InTime!");
+                           
+}
+
+#[cfg(not(target_os="intime"))]
 fn sockname<F>(f: F) -> io::Result<SocketAddr>
     where F: FnOnce(*mut c::sockaddr, *mut c::socklen_t) -> c_int
 {
@@ -91,6 +107,14 @@ fn sockname<F>(f: F) -> io::Result<SocketAddr>
     }
 }
 
+#[cfg(target_os="intime")]
+fn sockname<F>(f: F) -> io::Result<SocketAddr>
+    where F: FnOnce(*mut c::sockaddr, *mut c::socklen_t) -> c_int
+{
+    panic!("Not supported in InTime!");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn sockaddr_to_addr(storage: &c::sockaddr_storage,
                     len: usize) -> io::Result<SocketAddr> {
     match storage.ss_family as c_int {
@@ -111,6 +135,12 @@ pub fn sockaddr_to_addr(storage: &c::sockaddr_storage,
         }
     }
 }
+
+#[cfg(target_os="intime")]
+pub fn sockaddr_to_addr(storage: &c::sockaddr_storage,
+                    len: usize) -> io::Result<SocketAddr> {
+    panic!("Not supported in InTime!");    
+                    }
 
 #[cfg(target_os = "android")]
 fn to_ipv6mr_interface(value: u32) -> c_int {
@@ -156,11 +186,18 @@ unsafe impl Sync for LookupHost {}
 unsafe impl Send for LookupHost {}
 
 impl Drop for LookupHost {
+    #[cfg(not(target_os="intime"))]
     fn drop(&mut self) {
         unsafe { c::freeaddrinfo(self.original) }
     }
+
+    #[cfg(target_os="intime")]
+    fn drop(&mut self) {
+        panic!("Not supported in InTime!");
+    }
 }
 
+#[cfg(not(target_os="intime"))]
 pub fn lookup_host(host: &str) -> io::Result<LookupHost> {
     init();
 
@@ -183,6 +220,11 @@ pub fn lookup_host(host: &str) -> io::Result<LookupHost> {
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn lookup_host(host: &str) -> io::Result<LookupHost> {
+    panic!("Not supported in InTime!");
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // TCP streams
 ////////////////////////////////////////////////////////////////////////////////
@@ -192,6 +234,7 @@ pub struct TcpStream {
 }
 
 impl TcpStream {
+    #[cfg(not(target_os="intime"))]
     pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
         init();
 
@@ -200,6 +243,11 @@ impl TcpStream {
         let (addrp, len) = addr.into_inner();
         cvt_r(|| unsafe { c::connect(*sock.as_inner(), addrp, len) })?;
         Ok(TcpStream { inner: sock })
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn connect(addr: &SocketAddr) -> io::Result<TcpStream> {
+        panic!("Not supported in InTime!");
     }
 
     pub fn socket(&self) -> &Socket { &self.inner }
@@ -234,6 +282,7 @@ impl TcpStream {
         self.inner.read_to_end(buf)
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let len = cmp::min(buf.len(), <wrlen_t>::max_value() as usize) as wrlen_t;
         let ret = cvt(unsafe {
@@ -245,16 +294,33 @@ impl TcpStream {
         Ok(ret as usize)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        panic!("Not supported in InTime!");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         sockname(|buf, len| unsafe {
             c::getpeername(*self.inner.as_inner(), buf, len)
         })
     }
 
+    #[cfg(target_os="intime")]
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        panic!("Not supported in InTime!");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
         sockname(|buf, len| unsafe {
             c::getsockname(*self.inner.as_inner(), buf, len)
         })
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn socket_addr(&self) -> io::Result<SocketAddr> {
+        panic!("Not supported in InTime!");
     }
 
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
@@ -273,13 +339,25 @@ impl TcpStream {
         self.inner.nodelay()
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         setsockopt(&self.inner, c::IPPROTO_IP, c::IP_TTL, ttl as c_int)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        panic!("Not supported in InTime!");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn ttl(&self) -> io::Result<u32> {
         let raw: c_int = getsockopt(&self.inner, c::IPPROTO_IP, c::IP_TTL)?;
         Ok(raw as u32)
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn ttl(&self) -> io::Result<u32> {
+        panic!("Not supported in InTime!");
     }
 
     pub fn take_error(&self) -> io::Result<Option<io::Error>> {
@@ -324,6 +402,7 @@ pub struct TcpListener {
 }
 
 impl TcpListener {
+    #[cfg(not(target_os="intime"))]
     pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
         init();
 
@@ -346,14 +425,25 @@ impl TcpListener {
         Ok(TcpListener { inner: sock })
     }
 
+    #[cfg(target_os="intime")]
+    pub fn bind(addr: &SocketAddr) -> io::Result<TcpListener> {
+        panic!("Not supported in InTime!");
+    }
+
     pub fn socket(&self) -> &Socket { &self.inner }
 
     pub fn into_socket(self) -> Socket { self.inner }
 
+    #[cfg(not(target_os="intime"))]
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
         sockname(|buf, len| unsafe {
             c::getsockname(*self.inner.as_inner(), buf, len)
         })
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn socket_addr(&self) -> io::Result<SocketAddr> {
+        panic!("Not supported in InTime!");
     }
 
     pub fn accept(&self) -> io::Result<(TcpStream, SocketAddr)> {
@@ -425,6 +515,7 @@ pub struct UdpSocket {
 }
 
 impl UdpSocket {
+    #[cfg(not(target_os="intime"))]
     pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
         init();
 
@@ -434,14 +525,26 @@ impl UdpSocket {
         Ok(UdpSocket { inner: sock })
     }
 
+    #[cfg(target_os="intime")]
+    pub fn bind(addr: &SocketAddr) -> io::Result<UdpSocket> {
+        panic!("Lel no.");
+    }
+
     pub fn socket(&self) -> &Socket { &self.inner }
 
     pub fn into_socket(self) -> Socket { self.inner }
 
+
+    #[cfg(not(target_os="intime"))]
     pub fn socket_addr(&self) -> io::Result<SocketAddr> {
         sockname(|buf, len| unsafe {
             c::getsockname(*self.inner.as_inner(), buf, len)
         })
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn socket_addr(&self) -> io::Result<SocketAddr> {
+        panic!("Not in InTime my friend.")
     }
 
     pub fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
@@ -452,6 +555,7 @@ impl UdpSocket {
         self.inner.peek_from(buf)
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn send_to(&self, buf: &[u8], dst: &SocketAddr) -> io::Result<usize> {
         let len = cmp::min(buf.len(), <wrlen_t>::max_value() as usize) as wrlen_t;
         let (dstp, dstlen) = dst.into_inner();
@@ -461,6 +565,11 @@ impl UdpSocket {
                       MSG_NOSIGNAL, dstp, dstlen)
         })?;
         Ok(ret as usize)
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn send_to(&self, buf: &[u8], dst: &SocketAddr) -> io::Result<usize> {
+        panic!("Not in InTime my friend.")
     }
 
     pub fn duplicate(&self) -> io::Result<UdpSocket> {
@@ -580,6 +689,7 @@ impl UdpSocket {
         self.inner.peek(buf)
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
         let len = cmp::min(buf.len(), <wrlen_t>::max_value() as usize) as wrlen_t;
         let ret = cvt(unsafe {
@@ -591,9 +701,20 @@ impl UdpSocket {
         Ok(ret as usize)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn send(&self, buf: &[u8]) -> io::Result<usize> {
+        panic!("Nope.");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
         let (addrp, len) = addr.into_inner();
         cvt_r(|| unsafe { c::connect(*self.inner.as_inner(), addrp, len) }).map(|_| ())
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn connect(&self, addr: &SocketAddr) -> io::Result<()> {
+        panic!("Nope.");
     }
 }
 

@@ -12,13 +12,13 @@
 #![crate_type = "rlib"]
 #![no_std]
 #![allocator]
-#![deny(warnings)]
 #![unstable(feature = "alloc_system",
             reason = "this library is unlikely to be stabilized in its current \
                       form or name",
             issue = "27783")]
 #![feature(allocator)]
 #![feature(staged_api)]
+#![feature(stmt_expr_attributes)]
 #![cfg_attr(any(unix, target_os = "redox"), feature(libc))]
 
 // The minimum alignment guaranteed by the architecture. This value is used to
@@ -151,23 +151,35 @@ mod imp {
     }
 }
 
+
+
 #[cfg(windows)]
 #[allow(bad_style)]
 mod imp {
     use MIN_ALIGN;
 
     type LPVOID = *mut u8;
+    type PVOID = *mut u8;
     type HANDLE = LPVOID;
     type SIZE_T = usize;
     type DWORD = u32;
     type BOOL = i32;
 
+    #[cfg(not(target_os="intime"))]
     extern "system" {
         fn GetProcessHeap() -> HANDLE;
         fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID;
         fn HeapReAlloc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID;
         fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL;
         fn GetLastError() -> DWORD;
+    }
+
+    #[cfg(target_os="intime")]
+    extern {
+        fn GetLastRtError() -> DWORD;
+        fn malloc(size: usize) -> PVOID;
+        fn realloc(memblock: PVOID, size: usize) -> PVOID;
+        fn free(ptr: PVOID);
     }
 
     #[repr(C)]
@@ -185,11 +197,13 @@ mod imp {
         aligned
     }
 
+    #[cfg(not(target_os="intime"))]
     pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
         if align <= MIN_ALIGN {
             HeapAlloc(GetProcessHeap(), 0, size as SIZE_T) as *mut u8
         } else {
             let ptr = HeapAlloc(GetProcessHeap(), 0, (size + align) as SIZE_T) as *mut u8;
+
             if ptr.is_null() {
                 return ptr;
             }
@@ -197,15 +211,33 @@ mod imp {
         }
     }
 
+    #[cfg(target_os="intime")]
+    pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
+        if align <= MIN_ALIGN {
+            malloc(size) as *mut u8
+        } else {
+            let ptr = malloc(size + align) as *mut u8;
+
+            if ptr.is_null() {
+                return ptr;
+            }
+            align_ptr(ptr, align)
+        }
+    }
+
+    #[cfg(not(target_os="intime"))]            
     pub unsafe fn reallocate(ptr: *mut u8, _old_size: usize, size: usize, align: usize) -> *mut u8 {
         if align <= MIN_ALIGN {
             HeapReAlloc(GetProcessHeap(), 0, ptr as LPVOID, size as SIZE_T) as *mut u8
+
         } else {
             let header = get_header(ptr);
+
             let new = HeapReAlloc(GetProcessHeap(),
                                   0,
                                   header.0 as LPVOID,
                                   (size + align) as SIZE_T) as *mut u8;
+
             if new.is_null() {
                 return new;
             }
@@ -213,6 +245,24 @@ mod imp {
         }
     }
 
+    #[cfg(target_os="intime")]
+    pub unsafe fn reallocate(ptr: *mut u8, _old_size: usize, size: usize, align: usize) -> *mut u8 {
+        if align <= MIN_ALIGN {
+            realloc(ptr, size) as *mut u8
+
+        } else {
+            let header = get_header(ptr);
+
+            let new = realloc(ptr, size + align);
+
+            if new.is_null() {
+                return new;
+            }
+            align_ptr(new, align)
+        }
+    }
+
+    #[cfg(not(target_os="intime"))]            
     pub unsafe fn reallocate_inplace(ptr: *mut u8,
                                      old_size: usize,
                                      size: usize,
@@ -223,20 +273,48 @@ mod imp {
                                   HEAP_REALLOC_IN_PLACE_ONLY,
                                   ptr as LPVOID,
                                   size as SIZE_T) as *mut u8;
+
             if new.is_null() { old_size } else { size }
         } else {
             old_size
         }
     }
 
+    #[cfg(target_os="intime")]
+    pub unsafe fn reallocate_inplace(ptr: *mut u8,
+                                     old_size: usize,
+                                     size: usize,
+                                     align: usize)
+                                     -> usize {
+        if align <= MIN_ALIGN {
+            let new = realloc(ptr, size);
+
+            if new.is_null() { old_size } else { size }
+        } else {
+            old_size
+        }
+    }
+
+    #[cfg(not(target_os="intime"))]            
     pub unsafe fn deallocate(ptr: *mut u8, _old_size: usize, align: usize) {
         if align <= MIN_ALIGN {
             let err = HeapFree(GetProcessHeap(), 0, ptr as LPVOID);
+
             debug_assert!(err != 0, "Failed to free heap memory: {}", GetLastError());
         } else {
             let header = get_header(ptr);
             let err = HeapFree(GetProcessHeap(), 0, header.0 as LPVOID);
             debug_assert!(err != 0, "Failed to free heap memory: {}", GetLastError());
+        }
+    }
+
+    #[cfg(target_os="intime")]
+    pub unsafe fn deallocate(ptr: *mut u8, _old_size: usize, align: usize) {
+        if align <= MIN_ALIGN {
+            free(ptr as PVOID);
+        } else {
+            let header = get_header(ptr);
+            free(header.0 as PVOID);
         }
     }
 

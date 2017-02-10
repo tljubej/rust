@@ -205,6 +205,7 @@ supported_targets! {
 
     ("x86_64-pc-windows-msvc", x86_64_pc_windows_msvc),
     ("i686-pc-windows-msvc", i686_pc_windows_msvc),
+    ("i686-pc-intime-msvc", i686_pc_intime_msvc),
     ("i586-pc-windows-msvc", i586_pc_windows_msvc),
 
     ("le32-unknown-nacl", le32_unknown_nacl),

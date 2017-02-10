@@ -31,7 +31,13 @@ pub fn errno() -> i32 {
     unsafe { c::GetLastError() as i32 }
 }
 
+#[cfg(target_os="intime")]
+pub fn error_string(errnum: i32) -> String {
+    format!("InTime Error {}", errnum).to_string()
+}
+
 /// Gets a detailed string description for the given error number.
+#[cfg(not(target_os="intime"))]
 pub fn error_string(errnum: i32) -> String {
     // This value is calculated from the macro
     // MAKELANGID(LANG_SYSTEM_DEFAULT, SUBLANG_SYS_DEFAULT)
@@ -107,11 +113,23 @@ impl Iterator for Env {
 }
 
 impl Drop for Env {
+    #[cfg(not(target_os="intime"))]
     fn drop(&mut self) {
         unsafe { c::FreeEnvironmentStringsW(self.base); }
     }
+
+    #[cfg(target_os="intime")]
+    fn drop(&mut self) {
+        panic!("no");
+    }
 }
 
+#[cfg(target_os="intime")]
+pub fn env() -> Env {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn env() -> Env {
     unsafe {
         let ch = c::GetEnvironmentStringsW();
@@ -213,18 +231,31 @@ impl StdError for JoinPathsError {
     fn description(&self) -> &str { "failed to join paths" }
 }
 
+#[cfg(not(target_os="intime"))]
 pub fn current_exe() -> io::Result<PathBuf> {
     super::fill_utf16_buf(|buf, sz| unsafe {
         c::GetModuleFileNameW(ptr::null_mut(), buf, sz)
     }, super::os2path)
 }
 
+#[cfg(target_os="intime")]
+pub fn current_exe() -> io::Result<PathBuf> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn getcwd() -> io::Result<PathBuf> {
     super::fill_utf16_buf(|buf, sz| unsafe {
         c::GetCurrentDirectoryW(sz, buf)
     }, super::os2path)
 }
 
+#[cfg(target_os="intime")]
+pub fn getcwd() -> io::Result<PathBuf> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn chdir(p: &path::Path) -> io::Result<()> {
     let p: &OsStr = p.as_ref();
     let mut p = p.encode_wide().collect::<Vec<_>>();
@@ -235,6 +266,12 @@ pub fn chdir(p: &path::Path) -> io::Result<()> {
     }).map(|_| ())
 }
 
+#[cfg(target_os="intime")]
+pub fn chdir(p: &path::Path) -> io::Result<()> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn getenv(k: &OsStr) -> io::Result<Option<OsString>> {
     let k = to_u16s(k)?;
     let res = super::fill_utf16_buf(|buf, sz| unsafe {
@@ -254,6 +291,12 @@ pub fn getenv(k: &OsStr) -> io::Result<Option<OsString>> {
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn getenv(k: &OsStr) -> io::Result<Option<OsString>> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn setenv(k: &OsStr, v: &OsStr) -> io::Result<()> {
     let k = to_u16s(k)?;
     let v = to_u16s(v)?;
@@ -263,6 +306,12 @@ pub fn setenv(k: &OsStr, v: &OsStr) -> io::Result<()> {
     }).map(|_| ())
 }
 
+#[cfg(target_os="intime")]
+pub fn setenv(k: &OsStr, v: &OsStr) -> io::Result<()> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn unsetenv(n: &OsStr) -> io::Result<()> {
     let v = to_u16s(n)?;
     cvt(unsafe {
@@ -270,12 +319,24 @@ pub fn unsetenv(n: &OsStr) -> io::Result<()> {
     }).map(|_| ())
 }
 
+#[cfg(target_os="intime")]
+pub fn unsetenv(n: &OsStr) -> io::Result<()> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn temp_dir() -> PathBuf {
     super::fill_utf16_buf(|buf, sz| unsafe {
         c::GetTempPathW(sz, buf)
     }, super::os2path).unwrap()
 }
 
+#[cfg(target_os="intime")]
+pub fn temp_dir() -> PathBuf {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn home_dir() -> Option<PathBuf> {
     ::env::var_os("HOME").or_else(|| {
         ::env::var_os("USERPROFILE")
@@ -296,6 +357,17 @@ pub fn home_dir() -> Option<PathBuf> {
     })
 }
 
+#[cfg(target_os="intime")]
+pub fn home_dir() -> Option<PathBuf> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn exit(code: i32) -> ! {
     unsafe { c::ExitProcess(code as c::UINT) }
+}
+
+#[cfg(target_os="intime")]
+pub fn exit(code: i32) -> ! {
+    unsafe { c::ExitRtProcess() }
 }

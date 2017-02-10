@@ -64,6 +64,7 @@ static mut DTORS: *mut Vec<(Key, Dtor)> = ptr::null_mut();
 // provides, There's a few extra calls to deal with destructors.
 
 #[inline]
+#[cfg(not(target_os="intime"))]
 pub unsafe fn create(dtor: Option<Dtor>) -> Key {
     let key = c::TlsAlloc();
     assert!(key != c::TLS_OUT_OF_INDEXES);
@@ -73,18 +74,44 @@ pub unsafe fn create(dtor: Option<Dtor>) -> Key {
     return key;
 }
 
+#[cfg(target_os="intime")]
+pub unsafe fn create(dtor: Option<Dtor>) -> Key {
+    let key = c::RtTlsAlloc();
+    assert!(key != 0xFFFFFFFF);
+    if let Some(f) = dtor {
+        register_dtor(key, f);
+    }
+    return key;
+}
+
 #[inline]
+#[cfg(not(target_os="intime"))]
 pub unsafe fn set(key: Key, value: *mut u8) {
     let r = c::TlsSetValue(key, value as c::LPVOID);
     debug_assert!(r != 0);
 }
 
 #[inline]
+#[cfg(target_os="intime")]
+pub unsafe fn set(key: Key, value: *mut u8) {
+let r = c::RtTlsSetValue(key, value as c::LPVOID);
+    debug_assert!(r != 0);
+}
+
+#[inline]
+#[cfg(target_os="intime")]
+pub unsafe fn get(key: Key) -> *mut u8 {
+    c::RtTlsGetValue(key) as *mut u8
+}
+
+#[inline]
+#[cfg(not(target_os="intime"))]
 pub unsafe fn get(key: Key) -> *mut u8 {
     c::TlsGetValue(key) as *mut u8
 }
 
 #[inline]
+#[cfg(not(target_os="intime"))]
 pub unsafe fn destroy(key: Key) {
     if unregister_dtor(key) {
         // FIXME: Currently if a key has a destructor associated with it we
@@ -103,6 +130,30 @@ pub unsafe fn destroy(key: Key) {
         // of strategy.
     } else {
         let r = c::TlsFree(key);
+        debug_assert!(r != 0);
+    }
+}
+
+#[inline]
+#[cfg(target_os="intime")]
+pub unsafe fn destroy(key: Key) {
+    if unregister_dtor(key) {
+        // FIXME: Currently if a key has a destructor associated with it we
+        // can't actually ever unregister it. If we were to
+        // unregister it, then any key destruction would have to be
+        // serialized with respect to actually running destructors.
+        //
+        // We want to avoid a race where right before run_dtors runs
+        // some destructors TlsFree is called. Allowing the call to
+        // TlsFree would imply that the caller understands that *all
+        // known threads* are not exiting, which is quite a difficult
+        // thing to know!
+        //
+        // For now we just leak all keys with dtors to "fix" this.
+        // Note that source [2] above shows precedent for this sort
+        // of strategy.
+    } else {
+        let r = c::RtTlsFree(key);
         debug_assert!(r != 0);
     }
 }
@@ -256,6 +307,7 @@ unsafe extern "system" fn on_tls_callback(h: c::LPVOID,
 }
 
 #[allow(dead_code)] // actually called above
+#[cfg(not(target_os="intime"))]
 unsafe fn run_dtors() {
     let mut any_run = true;
     for _ in 0..5 {
@@ -275,6 +327,34 @@ unsafe fn run_dtors() {
             let ptr = c::TlsGetValue(key);
             if !ptr.is_null() {
                 c::TlsSetValue(key, ptr::null_mut());
+                dtor(ptr as *mut _);
+                any_run = true;
+            }
+        }
+    }
+}
+
+#[allow(dead_code)] // actually called above
+#[cfg(target_os="intime")]
+unsafe fn run_dtors() {
+    let mut any_run = true;
+    for _ in 0..5 {
+        if !any_run { break }
+        any_run = false;
+        let dtors = {
+            DTOR_LOCK.lock();
+            let ret = if DTORS as usize <= 1 {
+                Vec::new()
+            } else {
+                (*DTORS).iter().map(|s| *s).collect()
+            };
+            DTOR_LOCK.unlock();
+            ret
+        };
+        for &(key, dtor) in &dtors {
+            let ptr = c::RtTlsGetValue(key);
+            if !ptr.is_null() {
+                c::RtTlsSetValue(key, ptr::null_mut());
                 dtor(ptr as *mut _);
                 any_run = true;
             }

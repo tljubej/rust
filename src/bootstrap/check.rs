@@ -334,9 +334,6 @@ pub fn krate(build: &Build,
         Mode::Libstd => {
             ("libstd", "src/rustc/std_shim", build.std_features(), "std_shim")
         }
-        Mode::Libtest => {
-            ("libtest", "src/rustc/test_shim", String::new(), "test_shim")
-        }
         Mode::Librustc => {
             ("librustc", "src/rustc", build.rustc_features(), "rustc-main")
         }

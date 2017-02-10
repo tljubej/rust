@@ -20,6 +20,7 @@ pub struct OsRng {
 
 impl OsRng {
     /// Create a new `OsRng`.
+    #[cfg(not(target_os="intime"))]
     pub fn new() -> io::Result<OsRng> {
         let mut hcp = 0;
         let ret = unsafe {
@@ -34,6 +35,11 @@ impl OsRng {
             Ok(OsRng { hcryptprov: hcp })
         }
     }
+
+    #[cfg(target_os="intime")]
+    pub fn new() -> io::Result<OsRng> {
+        panic!("");
+    }
 }
 
 impl Rng for OsRng {
@@ -47,6 +53,8 @@ impl Rng for OsRng {
         self.fill_bytes(&mut v);
         unsafe { mem::transmute(v) }
     }
+
+    #[cfg(not(target_os="intime"))]    
     fn fill_bytes(&mut self, v: &mut [u8]) {
         // CryptGenRandom takes a DWORD (u32) for the length so we need to
         // split up the buffer.
@@ -61,9 +69,15 @@ impl Rng for OsRng {
             }
         }
     }
+
+    #[cfg(target_os="intime")]    
+    fn fill_bytes(&mut self, v: &mut [u8]) {
+        panic!("");
+    }
 }
 
 impl Drop for OsRng {
+    #[cfg(not(target_os="intime"))]        
     fn drop(&mut self) {
         let ret = unsafe {
             c::CryptReleaseContext(self.hcryptprov, 0)
@@ -72,5 +86,10 @@ impl Drop for OsRng {
             panic!("couldn't release context: {}",
                    io::Error::last_os_error());
         }
+    }
+
+    #[cfg(target_os="intime")]        
+    fn drop(&mut self) {
+        panic!("");
     }
 }

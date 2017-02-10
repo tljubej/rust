@@ -81,6 +81,8 @@ pub type SOCKET = ::os::windows::raw::SOCKET;
 pub type socklen_t = c_int;
 pub type ADDRESS_FAMILY = USHORT;
 
+pub type RTHANDLE = USHORT;
+
 pub const TRUE: BOOL = 1;
 pub const FALSE: BOOL = 0;
 
@@ -293,6 +295,12 @@ pub const PIPE_WAIT: DWORD = 0x00000000;
 pub const PIPE_TYPE_BYTE: DWORD = 0x00000000;
 pub const PIPE_REJECT_REMOTE_CLIENTS: DWORD = 0x00000008;
 pub const PIPE_READMODE_BYTE: DWORD = 0x00000000;
+
+pub const BAD_RTHANDLE: RTHANDLE = 0xFFFF;
+
+pub const THIS_THREAD: BYTE = 0;
+pub const THIS_PROCESS: BYTE = 1;
+pub const ROOT_PROCESS: BYTE = 3;
 
 #[repr(C)]
 #[cfg(target_arch = "x86")]
@@ -510,6 +518,16 @@ pub struct SECURITY_ATTRIBUTES {
     pub lpSecurityDescriptor: LPVOID,
     pub bInheritHandle: BOOL,
 }
+
+#[repr(C)]
+pub struct tagProcessAttributes {
+    pub PoolMin: DWORD,
+    pub PoolMax: DWORD,
+    pub VsegSize: DWORD,
+    pub ObjDirSize: DWORD
+}
+
+pub type LPPROCESSATTRIBUTES = *mut tagProcessAttributes;
 
 #[repr(C)]
 pub struct PROCESS_INFORMATION {
@@ -840,6 +858,7 @@ pub type PCONSOLE_READCONSOLE_CONTROL = *mut CONSOLE_READCONSOLE_CONTROL;
 #[cfg(not(cargobuild))]
 extern {}
 
+#[cfg(not(target_os="intime"))]            
 extern "system" {
     pub fn WSAStartup(wVersionRequested: WORD,
                       lpWSAData: LPWSADATA) -> c_int;
@@ -1129,6 +1148,128 @@ extern "system" {
                                lpOverlapped: LPOVERLAPPED,
                                lpNumberOfBytesTransferred: LPDWORD,
                                bWait: BOOL) -> BOOL;
+}
+
+#[cfg(target_os="intime")]
+extern {
+    pub fn ExitRtProcess() -> !;
+    pub fn RtTlsAlloc() -> DWORD;
+    pub fn RtTlsFree(dwTlsIndex: DWORD) -> BOOL;
+    pub fn RtTlsGetValue(dwTlsIndex: DWORD) -> LPVOID;
+    pub fn RtTlsSetValue(dwTlsIndex: DWORD, lpTlsvalue: LPVOID) -> BOOL;
+    pub fn ReadRtConsole(
+                        lpBuffer: LPVOID,
+                        nNumberOfCharsToRead: DWORD,
+                        lpNumberOfCharsRead: LPDWORD,
+                        ) -> BOOL;
+
+    pub fn WriteRtConsole(
+                         lpBuffer: LPCVOID,
+                         nNumberOfCharsToWrite: DWORD,
+                         lpNumberOfCharsWritten: LPDWORD,
+                         ) -> BOOL;
+    pub fn GetRtThreadHandles() -> RTHANDLE;
+    pub fn RtSleepEx(milis: DWORD) -> BOOL;
+
+    pub fn printf(st: *const u8); 
+
+}
+
+#[cfg(target_os="intime")]
+extern "system" {
+    pub fn ioctlsocket(s: SOCKET, cmd: c_long, argp: *mut c_ulong) -> c_int;
+    pub fn InitializeCriticalSection(CriticalSection: *mut CRITICAL_SECTION);
+    pub fn EnterCriticalSection(CriticalSection: *mut CRITICAL_SECTION);
+    pub fn TryEnterCriticalSection(CriticalSection: *mut CRITICAL_SECTION) -> BOOLEAN;
+    pub fn LeaveCriticalSection(CriticalSection: *mut CRITICAL_SECTION);
+    pub fn DeleteCriticalSection(CriticalSection: *mut CRITICAL_SECTION);
+
+
+
+    pub fn RemoveDirectory(lpPathName: LPCSTR) -> BOOL;
+
+    pub fn GetFileInformationByHandle(hFile: HANDLE,
+                            lpFileInformation: LPBY_HANDLE_FILE_INFORMATION)
+                            -> BOOL;
+
+    pub fn SetLastError(dwErrCode: DWORD);
+    pub fn OpenProcessToken(ProcessHandle: HANDLE,
+                            DesiredAccess: DWORD,
+                            TokenHandle: *mut HANDLE) -> BOOL;
+    // pub fn GetCurrentProcess() -> HANDLE;
+    // pub fn GetCurrentThread() -> HANDLE;
+    // pub fn GetStdHandle(which: DWORD) -> HANDLE;
+    pub fn CreateThread(lpThreadAttributes: LPSECURITY_ATTRIBUTES,
+                        dwStackSize: SIZE_T,
+                        lpStartAddress: extern "system" fn(*mut c_void)
+                                                           -> DWORD,
+                        lpParameter: LPVOID,
+                        dwCreationFlags: DWORD,
+                        lpThreadId: LPDWORD) -> HANDLE;
+    pub fn WaitForSingleObject(hHandle: HANDLE,
+                               dwMilliseconds: DWORD) -> DWORD;
+    pub fn Sleep(dwMilliseconds: DWORD);
+    pub fn FormatMessageW(flags: DWORD,
+                          lpSrc: LPVOID,
+                          msgId: DWORD,
+                          langId: DWORD,
+                          buf: LPWSTR,
+                          nsize: DWORD,
+                          args: *const c_void)
+                          -> DWORD;
+
+    pub fn GetLastError() -> DWORD;
+    pub fn QueryPerformanceFrequency(lpFrequency: *mut LARGE_INTEGER) -> BOOL;
+    pub fn QueryPerformanceCounter(lpPerformanceCount: *mut LARGE_INTEGER)
+                                   -> BOOL;
+    pub fn GetExitCodeProcess(hProcess: HANDLE, lpExitCode: LPDWORD) -> BOOL;
+    pub fn TerminateProcess(hProcess: HANDLE, uExitCode: UINT) -> BOOL;
+    pub fn RtCreateProcess(lpApplicationName: LPCSTR,
+                          lpCommandLine: LPSTR,
+                          lpProcessAttributes: LPPROCESSATTRIBUTES,
+                          dwCreationFlags: DWORD)
+                          -> RTHANDLE;
+    pub fn GetRtEnvironmentVariable(n: LPCSTR, v: LPSTR, nsize: LPDWORD) -> DWORD;
+    pub fn PutRtEnvironmentVariable(n: LPCSTR, v: LPCSTR) -> BOOL;
+    pub fn CreateHardLinkW(lpSymlinkFileName: LPCWSTR,
+                           lpTargetFileName: LPCWSTR,
+                           lpSecurityAttributes: LPSECURITY_ATTRIBUTES)
+                           -> BOOL;
+    pub fn MoveFileExW(lpExistingFileName: LPCWSTR,
+                       lpNewFileName: LPCWSTR,
+                       dwFlags: DWORD)
+                       -> BOOL;
+    pub fn SetFilePointerEx(hFile: HANDLE,
+                            liDistanceToMove: LARGE_INTEGER,
+                            lpNewFilePointer: PLARGE_INTEGER,
+                            dwMoveMethod: DWORD)
+                            -> BOOL;
+    pub fn FlushFileBuffers(hFile: HANDLE) -> BOOL;
+    pub fn CreateFileW(lpFileName: LPCWSTR,
+                       dwDesiredAccess: DWORD,
+                       dwShareMode: DWORD,
+                       lpSecurityAttributes: LPSECURITY_ATTRIBUTES,
+                       dwCreationDisposition: DWORD,
+                       dwFlagsAndAttributes: DWORD,
+                       hTemplateFile: HANDLE)
+                       -> HANDLE;
+
+
+    pub fn LoadLibrary(name: LPCSTR) -> HMODULE;
+    pub fn FreeLibrary(handle: HMODULE) -> BOOL;
+    pub fn GetProcAddress(handle: HMODULE,
+                          name: LPCSTR) -> *mut c_void;
+
+    pub fn CreateEventA(lpEventAttributes: LPSECURITY_ATTRIBUTES,
+                        bManualReset: BOOL,
+                        bInitialState: BOOL,
+                        lpName: LPCSTR) -> HANDLE;
+    pub fn WaitForMultipleObjects(nCount: DWORD,
+                                  lpHandles: *const HANDLE,
+                                  bWaitAll: BOOL,
+                                  dwMilliseconds: DWORD) -> DWORD;
+
+
 }
 
 // Functions that aren't available on Windows XP, but we still use them and just

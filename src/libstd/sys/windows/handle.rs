@@ -41,9 +41,25 @@ impl Handle {
         Handle(RawHandle::new(handle))
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn new_event(manual: bool, init: bool) -> io::Result<Handle> {
         unsafe {
             let event = c::CreateEventW(ptr::null_mut(),
+                                        manual as c::BOOL,
+                                        init as c::BOOL,
+                                        ptr::null());
+            if event.is_null() {
+                Err(io::Error::last_os_error())
+            } else {
+                Ok(Handle::new(event))
+            }
+        }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn new_event(manual: bool, init: bool) -> io::Result<Handle> {
+        unsafe {
+            let event = c::CreateEventA(ptr::null_mut(),
                                         manual as c::BOOL,
                                         init as c::BOOL,
                                         ptr::null());
@@ -68,8 +84,14 @@ impl Deref for Handle {
 }
 
 impl Drop for Handle {
+    #[cfg(not(target_os="intime"))]    
     fn drop(&mut self) {
         unsafe { let _ = c::CloseHandle(self.raw()); }
+    }
+
+    #[cfg(target_os="intime")]    
+    fn drop(&mut self) {
+        panic!("");
     }
 }
 
@@ -80,6 +102,12 @@ impl RawHandle {
 
     pub fn raw(&self) -> c::HANDLE { self.0 }
 
+    #[cfg(target_os="intime")]
+    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        panic!("no");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let mut read = 0;
         let len = cmp::min(buf.len(), <c::DWORD>::max_value() as usize) as c::DWORD;
@@ -101,6 +129,13 @@ impl RawHandle {
         }
     }
 
+
+    #[cfg(target_os="intime")]
+    pub fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
+        panic!("k");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn read_at(&self, buf: &mut [u8], offset: u64) -> io::Result<usize> {
         let mut read = 0;
         let len = cmp::min(buf.len(), <c::DWORD>::max_value() as usize) as c::DWORD;
@@ -118,6 +153,7 @@ impl RawHandle {
         }
     }
 
+    #[cfg(not(target_os="intime"))]
     pub unsafe fn read_overlapped(&self,
                                   buf: &mut [u8],
                                   overlapped: *mut c::OVERLAPPED)
@@ -142,6 +178,22 @@ impl RawHandle {
         }
     }
 
+    #[cfg(target_os="intime")]
+    pub unsafe fn read_overlapped(&self,
+                                  buf: &mut [u8],
+                                  overlapped: *mut c::OVERLAPPED)
+                                  -> io::Result<Option<usize>> {
+        panic!("nikad");
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn overlapped_result(&self,
+                             overlapped: *mut c::OVERLAPPED,
+                             wait: bool) -> io::Result<usize> {
+        panic!("nu");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn overlapped_result(&self,
                              overlapped: *mut c::OVERLAPPED,
                              wait: bool) -> io::Result<usize> {
@@ -165,10 +217,16 @@ impl RawHandle {
         }
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn cancel_io(&self) -> io::Result<()> {
         unsafe {
             cvt(c::CancelIo(self.raw())).map(|_| ())
         }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn cancel_io(&self) -> io::Result<()> {
+        panic!("nope");
     }
 
     pub fn read_to_end(&self, buf: &mut Vec<u8>) -> io::Result<usize> {
@@ -176,6 +234,12 @@ impl RawHandle {
         (&mut me).read_to_end(buf)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
+        panic!("nein");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let mut amt = 0;
         let len = cmp::min(buf.len(), <c::DWORD>::max_value() as usize) as c::DWORD;
@@ -186,6 +250,13 @@ impl RawHandle {
         Ok(amt as usize)
     }
 
+
+    #[cfg(target_os="intime")]
+    pub fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
+        panic!("hop");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn write_at(&self, buf: &[u8], offset: u64) -> io::Result<usize> {
         let mut written = 0;
         let len = cmp::min(buf.len(), <c::DWORD>::max_value() as usize) as c::DWORD;
@@ -199,6 +270,13 @@ impl RawHandle {
         Ok(written as usize)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn duplicate(&self, access: c::DWORD, inherit: bool,
+                     options: c::DWORD) -> io::Result<Handle> {
+        panic!("ne");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn duplicate(&self, access: c::DWORD, inherit: bool,
                      options: c::DWORD) -> io::Result<Handle> {
         let mut ret = 0 as c::HANDLE;

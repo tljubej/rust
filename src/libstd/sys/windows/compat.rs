@@ -25,6 +25,12 @@ use ffi::CString;
 use sync::atomic::{AtomicUsize, Ordering};
 use sys::c;
 
+#[cfg(target_os="intime")]
+pub fn lookup(module: &str, symbol: &str) -> Option<usize> {
+    panic!("");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn lookup(module: &str, symbol: &str) -> Option<usize> {
     let mut module: Vec<u16> = module.encode_utf16().collect();
     module.push(0);

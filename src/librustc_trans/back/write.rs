@@ -207,6 +207,8 @@ pub fn create_target_machine(sess: &Session) -> TargetMachineRef {
 
     let triple = &sess.target.target.llvm_target;
 
+    let triple = triple.replace("intime", "windows");
+
     let tm = unsafe {
         let triple = CString::new(triple.as_bytes()).unwrap();
         let cpu = match sess.opts.cg.target_cpu {

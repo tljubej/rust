@@ -213,8 +213,6 @@
 // Don't link to std. We are std.
 #![no_std]
 
-#![deny(missing_docs)]
-#![deny(missing_debug_implementations)]
 
 // Tell the compiler to link to either panic_abort or panic_unwind
 #![needs_panic_runtime]
@@ -223,10 +221,6 @@
 // crate the stage0 compiler will pick by default is available (most
 // obviously, if the user has disabled jemalloc in `./configure`).
 #![cfg_attr(any(stage0, feature = "force_alloc_system"), feature(alloc_system))]
-
-// Turn warnings into errors, but only after stage0, where it can be useful for
-// code to emit warnings during language transitions
-#![deny(warnings)]
 
 // std may use features in a platform-specific way
 #![allow(unused_features)]

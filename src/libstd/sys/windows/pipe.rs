@@ -34,6 +34,11 @@ pub struct Pipes {
     pub theirs: AnonPipe,
 }
 
+#[cfg(target_os="intime")]
+pub fn anon_pipe(ours_readable: bool) -> io::Result<Pipes> {
+    panic!("")
+}
+
 /// Although this looks similar to `anon_pipe` in the Unix module it's actually
 /// subtly different. Here we'll return two pipes in the `Pipes` return value,
 /// but one is intended for "us" where as the other is intended for "someone
@@ -53,6 +58,7 @@ pub struct Pipes {
 /// mode. This means that technically speaking it should only ever be used
 /// with `OVERLAPPED` instances, but also works out ok if it's only ever used
 /// once at a time (which we do indeed guarantee).
+#[cfg(not(target_os="intime"))]
 pub fn anon_pipe(ours_readable: bool) -> io::Result<Pipes> {
     // Note that we specifically do *not* use `CreatePipe` here because
     // unfortunately the anonymous pipes returned do not support overlapped

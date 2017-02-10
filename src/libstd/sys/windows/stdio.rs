@@ -36,6 +36,7 @@ pub struct Stdin {
 pub struct Stdout(Output);
 pub struct Stderr(Output);
 
+#[cfg(not(target_os="intime"))]
 pub fn get(handle: c::DWORD) -> io::Result<Output> {
     let handle = unsafe { c::GetStdHandle(handle) };
     if handle == c::INVALID_HANDLE_VALUE {
@@ -53,6 +54,46 @@ pub fn get(handle: c::DWORD) -> io::Result<Output> {
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn get(handle: c::DWORD) -> io::Result<Output> {
+    Ok(Output::Console(NoClose::new(ptr::null_mut())))
+}
+
+#[cfg(target_os="intime")]
+fn write(out: &Output, data: &[u8]) -> io::Result<usize> {
+    // As with stdin on windows, stdout often can't handle writes of large
+    // sizes. For an example, see #14940. For this reason, don't try to
+    // write the entire output buffer on windows.
+    //
+    // For some other references, it appears that this problem has been
+    // encountered by others [1] [2]. We choose the number 8K just because
+    // libuv does the same.
+    //
+    // [1]: https://tahoe-lafs.org/trac/tahoe-lafs/ticket/1232
+    // [2]: http://www.mail-archive.com/log4net-dev@logging.apache.org/msg00661.html
+    const OUT_MAX: usize = 8192;
+    let len = cmp::min(data.len(), OUT_MAX);
+    let utf8 = match str::from_utf8(&data[..len]) {
+        Ok(s) => s,
+        Err(ref e) if e.valid_up_to() == 0 => return Err(invalid_encoding()),
+        Err(e) => str::from_utf8(&data[..e.valid_up_to()]).unwrap(),
+    };
+    let mut written = 0;
+    cvt(unsafe {
+        c::WriteRtConsole(
+                         utf8.as_ptr() as c::LPCVOID,
+                         utf8.len() as u32,
+                         &mut written,
+                         )
+    })?;
+
+    // FIXME if this only partially writes the utf16 buffer then we need to
+    //       figure out how many bytes of `data` were actually written
+    assert_eq!(written as usize, utf8.len());
+    Ok(utf8.len())
+}
+
+#[cfg(not(target_os="intime"))]
 fn write(out: &Output, data: &[u8]) -> io::Result<usize> {
     let handle = match *out {
         Output::Console(ref c) => c.get().raw(),
@@ -101,6 +142,7 @@ impl Stdin {
         })
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
         let handle = match self.handle {
             Output::Console(ref c) => c.get().raw(),
@@ -118,6 +160,41 @@ impl Stdin {
                                 utf16.len() as u32,
                                 &mut num,
                                 &mut input_control as c::PCONSOLE_READCONSOLE_CONTROL)
+            })?;
+            utf16.truncate(num as usize);
+            // FIXME: what to do about this data that has already been read?
+            let mut data = match String::from_utf16(&utf16) {
+                Ok(utf8) => utf8.into_bytes(),
+                Err(..) => return Err(invalid_encoding()),
+            };
+            if let Output::Console(_) = self.handle {
+                if let Some(&last_byte) = data.last() {
+                    if last_byte == CTRL_Z {
+                        data.pop();
+                    }
+                }
+            }
+            *utf8 = Cursor::new(data);
+        }
+
+        // MemReader shouldn't error here since we just filled it
+        utf8.read(buf)
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut utf8 = self.utf8.lock().unwrap();
+        // Read more if the buffer is empty
+        if utf8.position() as usize == utf8.get_ref().len() {
+            let mut utf16 = vec![0u16; 0x1000];
+            let mut num = 0;
+            let mut input_control = readconsole_input_control(CTRL_Z_MASK);
+            cvt(unsafe {
+                c::ReadRtConsole(
+                                utf16.as_mut_ptr() as c::LPVOID,
+                                utf16.len() as u32,
+                                &mut num,
+                                )
             })?;
             utf16.truncate(num as usize);
             // FIXME: what to do about this data that has already been read?
@@ -157,10 +234,22 @@ impl<'a> Read for &'a Stdin {
 }
 
 impl Stdout {
+    #[cfg(not(target_os="intime"))]
     pub fn new() -> io::Result<Stdout> {
         get(c::STD_OUTPUT_HANDLE).map(Stdout)
     }
 
+    #[cfg(not(target_os="intime"))]
+    pub fn write(&self, data: &[u8]) -> io::Result<usize> {
+        write(&self.0, data)
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn new() -> io::Result<Stdout> {
+        get(c::STD_OUTPUT_HANDLE).map(Stdout)
+    }
+
+    #[cfg(target_os="intime")]
     pub fn write(&self, data: &[u8]) -> io::Result<usize> {
         write(&self.0, data)
     }

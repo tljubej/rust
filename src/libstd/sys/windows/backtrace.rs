@@ -114,6 +114,13 @@ pub fn write(w: &mut Write) -> io::Result<()> {
     }
 }
 
+#[cfg(target_os="intime")]
+unsafe fn _write(w: &mut Write) -> io::Result<()> {
+    write!(w, "stack backtrace writing not supported in InTime target.\n")?;
+    Ok(())
+}
+
+#[cfg(not(target_os="intime"))]
 unsafe fn _write(w: &mut Write) -> io::Result<()> {
     let dbghelp = match DynamicLibrary::open("dbghelp.dll") {
         Ok(lib) => lib,

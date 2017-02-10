@@ -64,6 +64,7 @@ impl Thread {
         unsafe { c::WaitForSingleObject(self.handle.raw(), c::INFINITE); }
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn yield_now() {
         // This function will return 0 if there are no other threads to execute,
         // but this also means that the yield was useless so this isn't really a
@@ -71,9 +72,22 @@ impl Thread {
         unsafe { c::SwitchToThread(); }
     }
 
+    #[cfg(target_os="intime")]
+    pub fn yield_now() {
+        unsafe { c::RtSleepEx(0); }
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn sleep(dur: Duration) {
         unsafe {
             c::Sleep(super::dur2timeout(dur))
+        }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn sleep(dur: Duration) {
+        unsafe {
+            c::RtSleepEx(super::dur2timeout(dur));
         }
     }
 

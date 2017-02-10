@@ -92,6 +92,13 @@ impl fmt::Debug for ReadDir {
 
 impl Iterator for ReadDir {
     type Item = io::Result<DirEntry>;
+
+    #[cfg(target_os="intime")]
+    fn next(&mut self) -> Option<io::Result<DirEntry>> {
+        panic!("");
+    }
+
+    #[cfg(not(target_os="intime"))]
     fn next(&mut self) -> Option<io::Result<DirEntry>> {
         if let Some(first) = self.first.take() {
             if let Some(e) = DirEntry::new(&self.root, &first) {
@@ -117,9 +124,15 @@ impl Iterator for ReadDir {
 }
 
 impl Drop for FindNextFileHandle {
+    #[cfg(not(target_os="intime"))]
     fn drop(&mut self) {
         let r = unsafe { c::FindClose(self.0) };
         debug_assert!(r != 0);
+    }
+
+    #[cfg(target_os="intime")]
+    fn drop(&mut self) {
+        
     }
 }
 
@@ -254,6 +267,7 @@ impl OpenOptions {
 }
 
 impl File {
+    #[cfg(not(target_os="intime"))]
     pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
         let path = to_u16s(path)?;
         let handle = unsafe {
@@ -272,13 +286,25 @@ impl File {
         }
     }
 
+    #[cfg(target_os="intime")]
+    pub fn open(path: &Path, opts: &OpenOptions) -> io::Result<File> {
+        panic!("Nop.");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn fsync(&self) -> io::Result<()> {
         cvt(unsafe { c::FlushFileBuffers(self.handle.raw()) })?;
         Ok(())
     }
 
+    #[cfg(target_os="intime")]
+    pub fn fsync(&self) -> io::Result<()> {
+        panic!("Nop.");
+    }   
+
     pub fn datasync(&self) -> io::Result<()> { self.fsync() }
 
+    #[cfg(not(target_os="intime"))]
     pub fn truncate(&self, size: u64) -> io::Result<()> {
         let mut info = c::FILE_END_OF_FILE_INFO {
             EndOfFile: size as c::LARGE_INTEGER,
@@ -293,6 +319,12 @@ impl File {
         Ok(())
     }
 
+    #[cfg(target_os="intime")]
+    pub fn truncate(&self, size: u64) -> io::Result<()> {
+        panic!("Lelnope.");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn file_attr(&self) -> io::Result<FileAttr> {
         unsafe {
             let mut info: c::BY_HANDLE_FILE_INFORMATION = mem::zeroed();
@@ -314,6 +346,11 @@ impl File {
             }
             Ok(attr)
         }
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn file_attr(&self) -> io::Result<FileAttr> {
+        panic!("kekno");
     }
 
     pub fn read(&self, buf: &mut [u8]) -> io::Result<usize> {
@@ -338,6 +375,7 @@ impl File {
 
     pub fn flush(&self) -> io::Result<()> { Ok(()) }
 
+    #[cfg(not(target_os="intime"))]
     pub fn seek(&self, pos: SeekFrom) -> io::Result<u64> {
         let (whence, pos) = match pos {
             // Casting to `i64` is fine, `SetFilePointerEx` reinterprets this
@@ -355,6 +393,12 @@ impl File {
         Ok(newpos as u64)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn seek(&self, pos: SeekFrom) -> io::Result<u64> {
+        panic!("keknay.");
+    }
+
+
     pub fn duplicate(&self) -> io::Result<File> {
         Ok(File {
             handle: self.handle.duplicate(0, true, c::DUPLICATE_SAME_ACCESS)?,
@@ -365,6 +409,7 @@ impl File {
 
     pub fn into_handle(self) -> Handle { self.handle }
 
+    #[cfg(not(target_os="intime"))]
     fn reparse_point<'a>(&self,
                          space: &'a mut [u8; c::MAXIMUM_REPARSE_DATA_BUFFER_SIZE])
                          -> io::Result<(c::DWORD, &'a c::REPARSE_DATA_BUFFER)> {
@@ -382,6 +427,13 @@ impl File {
             })?;
             Ok((bytes, &*(space.as_ptr() as *const c::REPARSE_DATA_BUFFER)))
         }
+    }
+
+    #[cfg(target_os="intime")]
+    fn reparse_point<'a>(&self,
+                         space: &'a mut [u8; c::MAXIMUM_REPARSE_DATA_BUFFER_SIZE])
+                         -> io::Result<(c::DWORD, &'a c::REPARSE_DATA_BUFFER)> {
+        panic!("noooooo");
     }
 
     fn readlink(&self) -> io::Result<PathBuf> {
@@ -419,6 +471,7 @@ impl File {
         }
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
         let mut info = c::FILE_BASIC_INFO {
             CreationTime: 0,
@@ -435,6 +488,11 @@ impl File {
                                           size as c::DWORD)
         })?;
         Ok(())
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn set_permissions(&self, perm: FilePermissions) -> io::Result<()> {
+        panic!("nope");
     }
 }
 
@@ -550,6 +608,7 @@ impl FileType {
 impl DirBuilder {
     pub fn new() -> DirBuilder { DirBuilder }
 
+    #[cfg(not(target_os="intime"))]
     pub fn mkdir(&self, p: &Path) -> io::Result<()> {
         let p = to_u16s(p)?;
         cvt(unsafe {
@@ -557,8 +616,14 @@ impl DirBuilder {
         })?;
         Ok(())
     }
+
+    #[cfg(target_os="intime")]
+    pub fn mkdir(&self, p: &Path) -> io::Result<()> {
+        panic!("no");
+    }
 }
 
+#[cfg(not(target_os="intime"))]
 pub fn readdir(p: &Path) -> io::Result<ReadDir> {
     let root = p.to_path_buf();
     let star = p.join("*");
@@ -579,12 +644,24 @@ pub fn readdir(p: &Path) -> io::Result<ReadDir> {
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn readdir(p: &Path) -> io::Result<ReadDir> {
+    panic!("no");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn unlink(p: &Path) -> io::Result<()> {
     let p_u16s = to_u16s(p)?;
     cvt(unsafe { c::DeleteFileW(p_u16s.as_ptr()) })?;
     Ok(())
 }
 
+#[cfg(target_os="intime")]
+pub fn unlink(p: &Path) -> io::Result<()> {
+    panic!("no");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
     let old = to_u16s(old)?;
     let new = to_u16s(new)?;
@@ -594,10 +671,21 @@ pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os="intime")]
+pub fn rename(old: &Path, new: &Path) -> io::Result<()> {
+    panic!("no");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn rmdir(p: &Path) -> io::Result<()> {
     let p = to_u16s(p)?;
     cvt(unsafe { c::RemoveDirectoryW(p.as_ptr()) })?;
     Ok(())
+}
+
+#[cfg(target_os="intime")]
+pub fn rmdir(p: &Path) -> io::Result<()> {
+    panic!("nope");
 }
 
 pub fn remove_dir_all(path: &Path) -> io::Result<()> {
@@ -642,6 +730,7 @@ pub fn symlink(src: &Path, dst: &Path) -> io::Result<()> {
     symlink_inner(src, dst, false)
 }
 
+#[cfg(not(target_os="intime"))]
 pub fn symlink_inner(src: &Path, dst: &Path, dir: bool) -> io::Result<()> {
     let src = to_u16s(src)?;
     let dst = to_u16s(dst)?;
@@ -668,6 +757,12 @@ pub fn symlink_inner(src: &Path, dst: &Path, dir: bool) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os="intime")]
+pub fn symlink_inner(src: &Path, dst: &Path, dir: bool) -> io::Result<()> {
+    panic!("ne");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn link(src: &Path, dst: &Path) -> io::Result<()> {
     let src = to_u16s(src)?;
     let dst = to_u16s(dst)?;
@@ -675,6 +770,11 @@ pub fn link(src: &Path, dst: &Path) -> io::Result<()> {
         c::CreateHardLinkW(dst.as_ptr(), src.as_ptr(), ptr::null_mut())
     })?;
     Ok(())
+}
+
+#[cfg(target_os="intime")]
+pub fn link(src: &Path, dst: &Path) -> io::Result<()> {
+    panic!("NU");
 }
 
 pub fn stat(path: &Path) -> io::Result<FileAttr> {
@@ -696,6 +796,7 @@ pub fn lstat(path: &Path) -> io::Result<FileAttr> {
     file.file_attr()
 }
 
+#[cfg(not(target_os="intime"))]
 pub fn set_perm(p: &Path, perm: FilePermissions) -> io::Result<()> {
     let p = to_u16s(p)?;
     unsafe {
@@ -704,6 +805,12 @@ pub fn set_perm(p: &Path, perm: FilePermissions) -> io::Result<()> {
     }
 }
 
+#[cfg(target_os="intime")]
+pub fn set_perm(p: &Path, perm: FilePermissions) -> io::Result<()> {
+    panic!("Nein");
+}
+
+#[cfg(not(target_os="intime"))]
 fn get_path(f: &File) -> io::Result<PathBuf> {
     super::fill_utf16_buf(|buf, sz| unsafe {
         c::GetFinalPathNameByHandleW(f.handle.raw(), buf, sz,
@@ -711,6 +818,11 @@ fn get_path(f: &File) -> io::Result<PathBuf> {
     }, |buf| {
         PathBuf::from(OsString::from_wide(buf))
     })
+}
+
+#[cfg(target_os="intime")]
+fn get_path(f: &File) -> io::Result<PathBuf> {
+    panic!("olol");
 }
 
 pub fn canonicalize(p: &Path) -> io::Result<PathBuf> {
@@ -723,6 +835,12 @@ pub fn canonicalize(p: &Path) -> io::Result<PathBuf> {
     get_path(&f)
 }
 
+#[cfg(target_os="intime")]
+pub fn copy(from: &Path, to: &Path) -> io::Result<u64> {
+    panic!("nu");
+}
+
+#[cfg(not(target_os="intime"))]
 pub fn copy(from: &Path, to: &Path) -> io::Result<u64> {
     unsafe extern "system" fn callback(
         _TotalFileSize: c::LARGE_INTEGER,
@@ -753,12 +871,18 @@ pub fn symlink_junction<P: AsRef<Path>, Q: AsRef<Path>>(src: P, dst: Q) -> io::R
     symlink_junction_inner(src.as_ref(), dst.as_ref())
 }
 
+#[cfg(target_os="intime")]
+fn symlink_junction_inner(target: &Path, junction: &Path) -> io::Result<()> {
+    panic!("kekno");
+}
+
 // Creating a directory junction on windows involves dealing with reparse
 // points and the DeviceIoControl function, and this code is a skeleton of
 // what can be found here:
 //
 // http://www.flexhex.com/docs/articles/hard-links.phtml
 #[allow(dead_code)]
+#[cfg(not(target_os="intime"))]
 fn symlink_junction_inner(target: &Path, junction: &Path) -> io::Result<()> {
     let d = DirBuilder::new();
     d.mkdir(&junction)?;

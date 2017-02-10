@@ -10,6 +10,8 @@
 
 #![unstable(issue = "0", feature = "windows_net")]
 
+
+
 use cmp;
 use io::{self, Read};
 use libc::{c_int, c_void, c_ulong};
@@ -38,6 +40,7 @@ pub struct Socket(c::SOCKET);
 
 /// Checks whether the Windows socket interface has been started already, and
 /// if not, starts it.
+#[cfg(not(target_os="intime"))]
 pub fn init() {
     static START: Once = Once::new();
 
@@ -51,9 +54,20 @@ pub fn init() {
     });
 }
 
+#[cfg(target_os="intime")]
+pub fn init() {
+    panic!("nu");
+}
+
 /// Returns the last error from the Windows socket interface.
+#[cfg(not(target_os="intime"))]
 fn last_error() -> io::Error {
     io::Error::from_raw_os_error(unsafe { c::WSAGetLastError() })
+}
+
+#[cfg(target_os="intime")]
+fn last_error() -> io::Error {
+    panic!("nein");
 }
 
 #[doc(hidden)]
@@ -100,6 +114,12 @@ pub fn cvt_r<T, F>(mut f: F) -> io::Result<T>
 }
 
 impl Socket {
+    #[cfg(target_os="intime")]
+    pub fn new(addr: &SocketAddr, ty: c_int) -> io::Result<Socket> {
+        panic!("k");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn new(addr: &SocketAddr, ty: c_int) -> io::Result<Socket> {
         let fam = match *addr {
             SocketAddr::V4(..) => c::AF_INET,
@@ -116,6 +136,7 @@ impl Socket {
         Ok(socket)
     }
 
+    #[cfg(not(target_os="intime"))]
     pub fn accept(&self, storage: *mut c::SOCKADDR,
                   len: *mut c_int) -> io::Result<Socket> {
         let socket = unsafe {
@@ -128,6 +149,18 @@ impl Socket {
         Ok(socket)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn accept(&self, storage: *mut c::SOCKADDR,
+                  len: *mut c_int) -> io::Result<Socket> {
+        panic!("na");
+    }
+
+    #[cfg(target_os="intime")]
+    pub fn duplicate(&self) -> io::Result<Socket> {
+        panic!("ne");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn duplicate(&self) -> io::Result<Socket> {
         let socket = unsafe {
             let mut info: c::WSAPROTOCOL_INFO = mem::zeroed();
@@ -147,6 +180,12 @@ impl Socket {
         Ok(socket)
     }
 
+    #[cfg(target_os="intime")]
+    fn recv_with_flags(&self, buf: &mut [u8], flags: c_int) -> io::Result<usize> {
+        panic!("kekno");
+    }
+
+    #[cfg(not(target_os="intime"))]
     fn recv_with_flags(&self, buf: &mut [u8], flags: c_int) -> io::Result<usize> {
         // On unix when a socket is shut down all further reads return 0, so we
         // do the same on windows to map a shut down socket to returning EOF.
@@ -168,6 +207,13 @@ impl Socket {
         self.recv_with_flags(buf, c::MSG_PEEK)
     }
 
+    #[cfg(target_os="intime")]
+    fn recv_from_with_flags(&self, buf: &mut [u8], flags: c_int)
+                            -> io::Result<(usize, SocketAddr)> {
+                                panic!("ne");
+                            }
+
+    #[cfg(not(target_os="intime"))]
     fn recv_from_with_flags(&self, buf: &mut [u8], flags: c_int)
                             -> io::Result<(usize, SocketAddr)> {
         let mut storage: c::SOCKADDR_STORAGE_LH = unsafe { mem::zeroed() };
@@ -205,6 +251,14 @@ impl Socket {
         (&mut me).read_to_end(buf)
     }
 
+    #[cfg(target_os="intime")]
+    pub fn set_timeout(&self, dur: Option<Duration>,
+                       kind: c_int) -> io::Result<()> {
+                           panic!("ne");
+                       }
+
+
+    #[cfg(not(target_os="intime"))]
     pub fn set_timeout(&self, dur: Option<Duration>,
                        kind: c_int) -> io::Result<()> {
         let timeout = match dur {
@@ -221,6 +275,13 @@ impl Socket {
         net::setsockopt(self, c::SOL_SOCKET, kind, timeout)
     }
 
+
+    #[cfg(target_os="intime")]
+    pub fn timeout(&self, kind: c_int) -> io::Result<Option<Duration>> {
+        panic!("ne");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn timeout(&self, kind: c_int) -> io::Result<Option<Duration>> {
         let raw: c::DWORD = net::getsockopt(self, c::SOL_SOCKET, kind)?;
         if raw == 0 {
@@ -232,6 +293,12 @@ impl Socket {
         }
     }
 
+    #[cfg(target_os="intime")]
+    fn set_no_inherit(&self) -> io::Result<()> {
+        panic!("nu");
+    }
+
+    #[cfg(not(target_os="intime"))]
     fn set_no_inherit(&self) -> io::Result<()> {
         sys::cvt(unsafe {
             c::SetHandleInformation(self.0 as c::HANDLE,
@@ -239,6 +306,12 @@ impl Socket {
         }).map(|_| ())
     }
 
+    #[cfg(target_os="intime")]
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        panic!("e");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         let how = match how {
             Shutdown::Write => c::SD_SEND,
@@ -249,6 +322,12 @@ impl Socket {
         Ok(())
     }
 
+    #[cfg(target_os="intime")]
+    pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
+        panic!("");
+    }
+
+    #[cfg(not(target_os="intime"))]
     pub fn set_nonblocking(&self, nonblocking: bool) -> io::Result<()> {
         let mut nonblocking = nonblocking as c_ulong;
         let r = unsafe { c::ioctlsocket(self.0, c::FIONBIO as c_int, &mut nonblocking) };
@@ -290,8 +369,14 @@ impl<'a> Read for &'a Socket {
 }
 
 impl Drop for Socket {
+    #[cfg(not(target_os="intime"))]    
     fn drop(&mut self) {
         let _ = unsafe { c::closesocket(self.0) };
+    }
+
+    #[cfg(target_os="intime")]
+    fn drop(&mut self) {
+        panic!("");
     }
 }
 

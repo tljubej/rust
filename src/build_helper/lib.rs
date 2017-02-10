@@ -56,6 +56,7 @@ pub fn run_silent(cmd: &mut Command) {
 pub fn gnu_target(target: &str) -> String {
     match target {
         "i686-pc-windows-msvc" => "i686-pc-win32".to_string(),
+        "i686-pc-intime-msvc" => "i686-pc-win32".to_string(),
         "x86_64-pc-windows-msvc" => "x86_64-pc-win32".to_string(),
         "i686-pc-windows-gnu" => "i686-w64-mingw32".to_string(),
         "x86_64-pc-windows-gnu" => "x86_64-w64-mingw32".to_string(),

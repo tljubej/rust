@@ -198,6 +198,7 @@ pub fn test(build: &Build, stage: u32, target: &str) {
     let mut cargo = build.cargo(&compiler, Mode::Libtest, target, "doc");
     cargo.arg("--manifest-path")
          .arg(build.src.join("src/rustc/test_shim/Cargo.toml"));
+
     build.run(&mut cargo);
     cp_r(&out_dir, &out)
 }

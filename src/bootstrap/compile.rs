@@ -24,7 +24,7 @@ use std::process::Command;
 use build_helper::{output, mtime};
 use filetime::FileTime;
 
-use util::{exe, libdir, is_dylib, copy};
+use util::{exe, libdir, is_dylib, copy, cp_r};
 use {Build, Compiler, Mode};
 
 /// Build the standard library.
@@ -66,6 +66,14 @@ pub fn std(build: &Build, target: &str, compiler: &Compiler) {
         }
     }
 
+    let libdir = build.sysroot_libdir(&compiler, target);
+
+    println!("Check for INTime stuff for target {}.", target);
+    if target.contains("msvc") {
+        println!("Copying INTime stuff.");
+        cp_r(Path::new("C:\\ArteLabMegaGit\\Downloads\\INtime-6.2-16364.2-Interfaces\\INtime\\rt\\lib"), &libdir);
+    }
+
     build.run(&mut cargo);
     update_mtime(build, &libstd_stamp(build, &compiler, target));
 }
@@ -96,6 +104,12 @@ pub fn std_link(build: &Build,
 
     if target.contains("musl") && !target.contains("mips") {
         copy_musl_third_party_objects(build, target, &libdir);
+    }
+
+    println!("Check for INTime stuff for target {}.", target);
+    if target.contains("msvc") {
+        println!("Copying INTime stuff.");
+        cp_r(Path::new("C:\\ArteLabMegaGit\\Downloads\\INtime-6.2-16364.2-Interfaces\\INtime\\rt\\lib"), &libdir);
     }
 }
 
@@ -261,6 +275,13 @@ pub fn rustc_link(build: &Build,
              target);
     let libdir = build.sysroot_libdir(&target_compiler, target);
     let out_dir = build.cargo_out(&compiler, Mode::Librustc, target);
+
+    println!("Check for INTime stuff for target {}.", target);
+    if target.contains("msvc") {
+        println!("Copying INTime stuff.");
+        cp_r(Path::new("C:\\ArteLabMegaGit\\Downloads\\INtime-6.2-16364.2-Interfaces\\INtime\\rt\\lib"), &libdir);
+    }
+
     add_to_sysroot(&out_dir, &libdir);
 }
 

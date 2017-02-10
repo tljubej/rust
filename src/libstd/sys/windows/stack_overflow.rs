@@ -41,12 +41,18 @@ extern "system" fn vectored_handler(ExceptionInfo: *mut c::EXCEPTION_POINTERS)
     }
 }
 
+#[cfg(not(target_os="intime"))]
 pub unsafe fn init() {
     if c::AddVectoredExceptionHandler(0, vectored_handler).is_null() {
         panic!("failed to install exception handler");
     }
     // Set the thread stack guarantee for the main thread.
     let _h = Handler::new();
+}
+
+#[cfg(target_os="intime")]
+pub unsafe fn init() {
+    
 }
 
 pub unsafe fn cleanup() {}

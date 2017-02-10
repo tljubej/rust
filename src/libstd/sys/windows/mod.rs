@@ -48,7 +48,9 @@ pub mod stdio;
 pub fn init() {
     ::alloc::oom::set_oom_handler(oom_handler);
 
+
     // See comment in sys/unix/mod.rs
+    #[cfg(not(target_os="intime"))]
     fn oom_handler() -> ! {
         use intrinsics;
         use ptr;
@@ -61,6 +63,14 @@ pub fn init() {
                          msg.len() as c::DWORD,
                          ptr::null_mut(),
                          ptr::null_mut());
+            intrinsics::abort();
+        }
+    }
+
+    #[cfg(target_os="intime")]
+    fn oom_handler() -> ! {
+        use intrinsics;
+        unsafe {
             intrinsics::abort();
         }
     }
@@ -172,7 +182,17 @@ fn os2path(s: &[u16]) -> PathBuf {
     PathBuf::from(OsString::from_wide(s))
 }
 
+#[cfg(target_os="intime")]
+fn wide_char_to_multi_byte(code_page: u32,
+                           flags: u32,
+                           s: &[u16],
+                           no_default_char: bool)
+                           -> io::Result<Vec<i8>> {
+                            panic!("");
+}
+
 #[allow(dead_code)] // Only used in backtrace::gnu::get_executable_filename()
+#[cfg(not(target_os="intime"))]
 fn wide_char_to_multi_byte(code_page: u32,
                            flags: u32,
                            s: &[u16],

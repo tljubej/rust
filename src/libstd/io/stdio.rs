@@ -20,11 +20,13 @@ use sys_common::remutex::{ReentrantMutex, ReentrantMutexGuard};
 use thread::LocalKeyState;
 
 /// Stdout used by print! and println! macros
+#[cfg(not(target_os="intime"))]            
 thread_local! {
     static LOCAL_STDOUT: RefCell<Option<Box<Write + Send>>> = {
         RefCell::new(None)
     }
 }
+
 
 /// A handle to a raw instance of the standard input stream of this process.
 ///
@@ -649,6 +651,7 @@ pub fn set_panic(sink: Option<Box<Write + Send>>) -> Option<Box<Write + Send>> {
                      with a more general mechanism",
            issue = "0")]
 #[doc(hidden)]
+#[cfg(not(target_os="intime"))]            
 pub fn set_print(sink: Option<Box<Write + Send>>) -> Option<Box<Write + Send>> {
     use mem;
     LOCAL_STDOUT.with(move |slot| {
@@ -659,10 +662,21 @@ pub fn set_print(sink: Option<Box<Write + Send>>) -> Option<Box<Write + Send>> {
     })
 }
 
+#[unstable(feature = "set_stdio",
+           reason = "this function may disappear completely or be replaced \
+                     with a more general mechanism",
+           issue = "0")]
+#[doc(hidden)]
+#[cfg(target_os="intime")]
+pub fn set_print(sink: Option<Box<Write + Send>>) -> Option<Box<Write + Send>> {
+    sink
+}
+
 #[unstable(feature = "print",
            reason = "implementation detail which may disappear or be replaced at any time",
            issue = "0")]
 #[doc(hidden)]
+#[cfg(not(target_os="intime"))]            
 pub fn _print(args: fmt::Arguments) {
     // As an implementation of the `println!` macro, we want to try our best to
     // not panic wherever possible and get the output somewhere. There are
@@ -692,6 +706,17 @@ pub fn _print(args: fmt::Arguments) {
     if let Err(e) = result {
         panic!("failed printing to stdout: {}", e);
     }
+}
+
+#[unstable(feature = "set_stdio",
+           reason = "this function may disappear completely or be replaced \
+                     with a more general mechanism",
+           issue = "0")]
+#[doc(hidden)]
+#[cfg(target_os="intime")]
+pub fn _print(args: fmt::Arguments) {
+    unsafe { ::sys::c::printf("jebem ti mater\n".as_ptr()) }
+    stdout_raw().expect("jebiga").write_fmt(args);
 }
 
 #[cfg(test)]
